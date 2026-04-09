@@ -1,0 +1,12 @@
+apiVersion: v2
+name: komari-server
+description: Helm chart for deploying Komari server using StatefulSet
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - komari
+  - monitoring
+home: https://github.com/komari-monitor/komari
+sources:
+  - https://github.com/komari-monitor/komari

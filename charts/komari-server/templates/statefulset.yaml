@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "komari-server.fullname" . }}
+  labels:
+    {{- include "komari-server.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "komari-server.fullname" . }}-headless
+  replicas: {{ .Values.replicaCount }}
+  podManagementPolicy: {{ .Values.statefulSet.podManagementPolicy }}
+  updateStrategy:
+    {{- toYaml .Values.statefulSet.updateStrategy | nindent 4 }}
+  selector:
+    matchLabels:
+      {{- include "komari-server.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "komari-server.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "komari-server.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: komari
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          {{- if or .Values.env.ADMIN_USERNAME .Values.env.ADMIN_PASSWORD }}
+          env:
+            {{- if .Values.env.ADMIN_USERNAME }}
+            - name: ADMIN_USERNAME
+              value: {{ .Values.env.ADMIN_USERNAME | quote }}
+            {{- end }}
+            {{- if .Values.env.ADMIN_PASSWORD }}
+            - name: ADMIN_PASSWORD
+              value: {{ .Values.env.ADMIN_PASSWORD | quote }}
+            {{- end }}
+          {{- end }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.persistentVolume.mountPath }}
+      {{- if .Values.persistentVolume.existingClaim }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistentVolume.existingClaim }}
+      {{- else if not .Values.persistentVolume.enabled }}
+      volumes:
+        - name: data
+          emptyDir: {}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if and .Values.persistentVolume.enabled (not .Values.persistentVolume.existingClaim) }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          {{- toYaml .Values.persistentVolume.accessModes | nindent 10 }}
+        resources:
+          requests:
+            storage: {{ .Values.persistentVolume.size }}
+        {{- if .Values.persistentVolume.storageClassName }}
+        storageClassName: {{ .Values.persistentVolume.storageClassName }}
+        {{- end }}
+  {{- end }}
